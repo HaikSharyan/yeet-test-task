@@ -1,20 +1,28 @@
-import type { GameSymbol } from '../config/symbols';
+import type { SpinResult, SymbolIndex } from "../domain/types";
 
 interface ResultDisplayProps {
-    symbols: readonly GameSymbol[];
+  result: SpinResult | null;
+  symbolsById: SymbolIndex;
 }
 
-export function ResultDisplay({ symbols }: ResultDisplayProps) {
-    return (
-        <strong
-            className="result-display"
-            aria-label={symbols.map((symbol) => symbol.name).join(', ')}
-        >
-            {symbols.map((symbol, index) => (
-                <span key={`${symbol.name}-${index}`} aria-hidden="true">
-          {symbol.glyph}
+export function ResultDisplay({ result, symbolsById }: ResultDisplayProps) {
+  if (!result) {
+    return <strong>-</strong>;
+  }
+
+  const resultLabel = result.reels
+    .map((symbolId) => {
+      return symbolsById.get(symbolId)?.label ?? "unknown";
+    })
+    .join(", ");
+
+  return (
+    <strong className="result-display" aria-label={resultLabel}>
+      {result.reels.map((symbolId, index) => (
+        <span key={`${symbolId}-${index}`} aria-hidden="true">
+          {symbolsById.get(symbolId)?.glyph ?? "?"}
         </span>
-            ))}
-        </strong>
-    );
+      ))}
+    </strong>
+  );
 }

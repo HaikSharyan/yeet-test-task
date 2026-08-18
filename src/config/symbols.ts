@@ -1,29 +1,58 @@
-export interface SymbolConfig {
-    name: string;
-    glyph: string;
-}
+import type { SymbolDefinition, SymbolIndex } from "../domain/types";
 
 export const symbols = [
-    {
-        name: 'cherry',
-        glyph: '🍒',
+  {
+    id: 1,
+    label: "cherry",
+    glyph: "🍒",
+    weight: 34,
+    payouts: {
+      2: 1,
+      3: 5,
     },
-    {
-        name: 'lemon',
-        glyph: '🍋',
+  },
+  {
+    id: 2,
+    label: "lemon",
+    glyph: "🍋",
+    weight: 27,
+    payouts: {
+      2: 1,
+      3: 10,
     },
-    {
-        name: 'bell',
-        glyph: '🔔',
+  },
+  {
+    id: 3,
+    label: "bell",
+    glyph: "🔔",
+    weight: 19,
+    payouts: {
+      2: 2,
+      3: 20,
     },
-    {
-        name: 'star',
-        glyph: '⭐',
+  },
+  {
+    id: 4,
+    label: "star",
+    glyph: "⭐",
+    weight: 13,
+    payouts: {
+      2: 3,
+      3: 50,
     },
-    {
-        name: 'diamond',
-        glyph: '💎',
+  },
+  {
+    id: 5,
+    label: "diamond",
+    glyph: "💎",
+    weight: 7,
+    payouts: {
+      2: 5,
+      3: 150,
     },
-] as const satisfies readonly SymbolConfig[];
+  },
+] as const satisfies readonly SymbolDefinition[];
 
-export type GameSymbol = (typeof symbols)[number];
+export const symbolsById: SymbolIndex = new Map(
+  symbols.map((symbol) => [symbol.id, symbol]),
+);
