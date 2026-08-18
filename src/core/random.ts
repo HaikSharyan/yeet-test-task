@@ -8,6 +8,8 @@ export function pickWeighted<T extends WeightedItem>(
   items: readonly T[],
   random: RandomSource = Math.random,
 ): T {
+  console.log("pickWeighted", random);
+
   if (items.length === 0) {
     throw new Error("Cannot select from an empty collection");
   }

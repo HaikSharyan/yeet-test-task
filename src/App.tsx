@@ -1,25 +1,21 @@
 import { useRef, useState } from "react";
-import { GameControls } from "./components/GameControls";
-import { GameHeader } from "./components/GameHeader";
-import { GameStage } from "./components/GameStage";
-import { GameStats } from "./components/GameStats";
-import { symbols, symbolsById } from "./config/symbols";
-import { generateResult } from "./domain/resultGenerator";
+import { symbolsById } from "./config/symbols";
+import { gameConfig } from "./config/gameConfig";
 import type { SpinResult } from "./domain/types";
+import { GameStats } from "./components/GameStats";
+import { GameHeader } from "./components/GameHeader";
+import { GameCanvas } from "./components/GameCanvas";
 import { calculateWin } from "./domain/winCalculator";
-
-const reelCount = 3;
-const betOptions = [1, 2, 5, 10] as const;
-const initialBalance = 100;
-const spinDuration = 500;
+import { GameControls } from "./components/GameControls";
+import { generateResult } from "./domain/resultGenerator";
 
 export default function App() {
   const [result, setResult] = useState<SpinResult>(() =>
-    generateResult(reelCount, symbols),
+    generateResult(gameConfig.reels, gameConfig.symbols),
   );
   const [lastResult, setLastResult] = useState<SpinResult | null>(null);
-  const [balance, setBalance] = useState(initialBalance);
-  const [bet, setBet] = useState<number>(betOptions[0]);
+  const [balance, setBalance] = useState<number>(gameConfig.initialBalance);
+  const [bet, setBet] = useState<number>(gameConfig.betOptions[0]);
   const [lastWin, setLastWin] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [message, setMessage] = useState("Place your bet");
@@ -37,7 +33,7 @@ export default function App() {
     setBalance((currentBalance) => currentBalance - bet);
     setMessage("Good luck!");
 
-    const nextResult = generateResult(reelCount, symbols);
+    const nextResult = generateResult(gameConfig.reels, gameConfig.symbols);
 
     window.setTimeout(() => {
       const win = calculateWin(nextResult, bet, symbolsById);
@@ -55,7 +51,7 @@ export default function App() {
       } else {
         setMessage("No win - try again");
       }
-    }, spinDuration);
+    }, gameConfig.spinDuration);
   };
 
   const displayedMessage =
@@ -66,7 +62,7 @@ export default function App() {
       <GameHeader />
 
       <section className="game-card">
-        <GameStage result={result} symbolsById={symbolsById} />
+        <GameCanvas result={result} />
 
         <GameStats
           balance={balance}
@@ -78,7 +74,7 @@ export default function App() {
 
         <GameControls
           bet={bet}
-          betOptions={betOptions}
+          betOptions={gameConfig.betOptions}
           spinning={spinning}
           affordable={affordable}
           message={displayedMessage}

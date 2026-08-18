@@ -10,6 +10,7 @@ export function generateResult(
   const reels: number[] = [];
 
   for (let reel = 0; reel < reelCount; reel++) {
+    console.log("generateResult", random);
     reels.push(pickWeighted(symbols, random).id);
   }
 
