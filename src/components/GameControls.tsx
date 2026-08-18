@@ -1,6 +1,7 @@
 interface GameControlsProps {
   bet: number;
   betOptions: readonly number[];
+  disabled: boolean;
   spinning: boolean;
   affordable: boolean;
   message: string;
@@ -11,6 +12,7 @@ interface GameControlsProps {
 export function GameControls({
   bet,
   betOptions,
+  disabled,
   spinning,
   affordable,
   message,
@@ -24,7 +26,7 @@ export function GameControls({
 
         <select
           value={bet}
-          disabled={spinning}
+          disabled={disabled}
           onChange={(event) => {
             onBetChange(Number(event.target.value));
           }}
@@ -40,7 +42,7 @@ export function GameControls({
       <button
         className="spin-button"
         type="button"
-        disabled={spinning || !affordable}
+        disabled={disabled || !affordable}
         onClick={onSpin}
       >
         {spinning ? "Spinning…" : "Spin"}

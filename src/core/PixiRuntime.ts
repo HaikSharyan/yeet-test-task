@@ -1,5 +1,7 @@
 import { Application } from "pixi.js";
-import type { ApplicationOptions } from "pixi.js";
+import type { ApplicationOptions, Ticker } from "pixi.js";
+
+type TickHandler = (ticker: Ticker) => void;
 
 export class PixiRuntime {
   readonly app = new Application();
@@ -10,6 +12,7 @@ export class PixiRuntime {
   async mount(
     host: HTMLElement,
     options: Partial<ApplicationOptions>,
+    onTick: TickHandler,
   ): Promise<boolean> {
     await this.app.init(options);
     this.initialized = true;
@@ -24,6 +27,7 @@ export class PixiRuntime {
     this.app.canvas.style.height = "auto";
 
     host.appendChild(this.app.canvas);
+    this.app.ticker.add(onTick);
 
     return true;
   }

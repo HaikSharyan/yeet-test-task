@@ -4,6 +4,12 @@ export interface ReelConfig {
   width: number;
   symbolHeight: number;
   gap: number;
+  spinDuration: number;
+  stopDelay: number;
+  speed: number;
+  accelerationDuration: number;
+  minStopDuration: number;
+  maxStopDuration: number;
 }
 
 export interface ThemeConfig {
@@ -19,7 +25,6 @@ export interface GameConfig {
   symbols: readonly SymbolDefinition[];
   betOptions: readonly number[];
   initialBalance: number;
-  spinDuration: number;
   reel: ReelConfig;
   theme: ThemeConfig;
 }

@@ -13,3 +13,8 @@ export type SymbolIndex = ReadonlyMap<SymbolId, SymbolDefinition>;
 export interface SpinResult {
   reels: SymbolId[];
 }
+
+export interface SpinRequest {
+  result: SpinResult;
+  bet: number;
+}

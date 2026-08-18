@@ -6,11 +6,16 @@ export const gameConfig = {
   symbols,
   betOptions: [1, 2, 5, 10],
   initialBalance: 100,
-  spinDuration: 500,
   reel: {
     width: 150,
     symbolHeight: 170,
     gap: 16,
+    spinDuration: 700,
+    stopDelay: 300,
+    speed: 1350,
+    accelerationDuration: 250,
+    minStopDuration: 450,
+    maxStopDuration: 900,
   },
   theme: {
     symbolFontSize: 84,

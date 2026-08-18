@@ -1,22 +1,40 @@
 import { useEffect, useRef, useState } from "react";
-
 import { GameLoader } from "./GameLoader";
 import { PixiGame } from "../game/PixiGame";
-import type { SpinResult } from "../domain/types";
-import { symbolsById } from "../config/symbols";
 import { gameConfig } from "../config/gameConfig";
+import { symbolsById } from "../config/symbols";
+import type { SpinRequest, SpinResult } from "../domain/types";
 
 interface GameCanvasProps {
   result: SpinResult;
+  onReady: () => void;
+  onSpinComplete: () => void;
+  spinRequest: SpinRequest | null;
 }
 
 type CanvasStatus = "loading" | "ready" | "error";
 
-export function GameCanvas({ result }: GameCanvasProps) {
+export function GameCanvas({
+  result,
+  onReady,
+  spinRequest,
+  onSpinComplete,
+}: GameCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<PixiGame | null>(null);
   const initialResultRef = useRef(result);
+  const callbacksRef = useRef({
+    onReady,
+    onSpinComplete,
+  });
   const [status, setStatus] = useState<CanvasStatus>("loading");
+
+  useEffect(() => {
+    callbacksRef.current = {
+      onReady,
+      onSpinComplete,
+    };
+  }, [onReady, onSpinComplete]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -25,7 +43,6 @@ export function GameCanvas({ result }: GameCanvasProps) {
       return;
     }
 
-    console.log(symbolsById);
     const game = new PixiGame(gameConfig, symbolsById);
 
     gameRef.current = game;
@@ -41,6 +58,7 @@ export function GameCanvas({ result }: GameCanvasProps) {
         }
 
         setStatus("ready");
+        callbacksRef.current.onReady();
       })
       .catch((error: unknown) => {
         console.error("Could not start the renderer", error);
@@ -56,6 +74,29 @@ export function GameCanvas({ result }: GameCanvasProps) {
       game.destroy();
     };
   }, []);
+
+  useEffect(() => {
+    if (!spinRequest || !gameRef.current) {
+      return;
+    }
+
+    let active = true;
+
+    void gameRef.current
+      .spin(spinRequest.result)
+      .catch((error: unknown) => {
+        console.error("Spin presentation failed", error);
+      })
+      .finally(() => {
+        if (active) {
+          callbacksRef.current.onSpinComplete();
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [spinRequest]);
 
   useEffect(() => {
     gameRef.current?.setResult(result);
