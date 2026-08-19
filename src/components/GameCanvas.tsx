@@ -83,7 +83,7 @@ export function GameCanvas({
     let active = true;
 
     void gameRef.current
-      .spin(spinRequest.result)
+      .spin(spinRequest.result, spinRequest.anticipate)
       .catch((error: unknown) => {
         console.error("Spin presentation failed", error);
       })
@@ -103,15 +103,19 @@ export function GameCanvas({
   }, [result]);
 
   const resultLabel = result.reels
-    .map((symbolId) => {
-      return symbolsById.get(symbolId)?.label ?? "unknown";
+    .map((reel) => {
+      return reel.symbols
+        .map((symbolId) => {
+          return symbolsById.get(symbolId)?.label ?? "unknown";
+        })
+        .join(", ");
     })
-    .join(", ");
+    .join(" / ");
 
   const stageWidth =
     gameConfig.reels * gameConfig.reel.width +
     (gameConfig.reels - 1) * gameConfig.reel.gap;
-  const stageHeight = gameConfig.reel.symbolHeight;
+  const stageHeight = gameConfig.rows * gameConfig.reel.symbolHeight;
 
   return (
     <div

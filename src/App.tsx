@@ -6,12 +6,13 @@ import { GameHeader } from "./components/GameHeader";
 import { GameCanvas } from "./components/GameCanvas";
 import { GameControls } from "./components/GameControls";
 import { calculateWin } from "./domain/winCalculator";
+import { shouldAnticipate } from "./domain/anticipation";
 import { generateResult } from "./domain/resultGenerator";
 import type { SpinRequest, SpinResult } from "./domain/types";
 
 export default function App() {
   const [result, setResult] = useState<SpinResult>(() =>
-    generateResult(gameConfig.reels, gameConfig.symbols),
+    generateResult(gameConfig.reels, gameConfig.rows, gameConfig.symbols),
   );
   const [lastWin, setLastWin] = useState(0);
   const [ready, setReady] = useState(false);
@@ -32,10 +33,15 @@ export default function App() {
       return;
     }
 
-    const nextResult = generateResult(gameConfig.reels, gameConfig.symbols);
+    const nextResult = generateResult(
+      gameConfig.reels,
+      gameConfig.rows,
+      gameConfig.symbols,
+    );
     const request: SpinRequest = {
       result: nextResult,
       bet,
+      anticipate: shouldAnticipate(nextResult, symbolsById),
     };
 
     spinningRef.current = true;

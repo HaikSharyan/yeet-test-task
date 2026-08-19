@@ -2,12 +2,13 @@ import { Container, Graphics, Text } from "pixi.js";
 import type { Ticker } from "pixi.js";
 import { pickWeighted } from "../core/random";
 import type { ReelConfig, ThemeConfig } from "../config/types";
-import { easeOutCubic, easeOutQuad, modulo } from "../core/math";
+import { easeOutCubic, easeOutQuad, modulo, oscillate } from "../core/math";
 import type { SymbolDefinition, SymbolId, SymbolIndex } from "../domain/types";
 
 interface SymbolView {
   container: Container;
   text: Text;
+  row: number;
 }
 
 interface LandingState {
@@ -18,9 +19,16 @@ interface LandingState {
   resolve: () => void;
 }
 
+interface WinState {
+  duration: number;
+  elapsed: number;
+  resolve: () => void;
+}
+
 interface ReelOptions {
   symbols: readonly SymbolDefinition[];
   symbolsById: SymbolIndex;
+  rows: number;
   reel: ReelConfig;
   theme: ThemeConfig;
 }
@@ -31,26 +39,35 @@ export class Reel {
   private readonly symbols: readonly SymbolDefinition[];
   private readonly symbolsById: SymbolIndex;
   private readonly config: ReelConfig;
+  private readonly theme: ThemeConfig;
+  private readonly rows: number;
   private readonly symbolViews: SymbolView[] = [];
   private readonly landingTargets = new Map<SymbolView, SymbolId>();
+  private readonly anticipationFrame = new Graphics();
 
   private readonly stripHeight: number;
   private readonly windowHeight: number;
+  private readonly winViews: SymbolView[] = [];
 
+  private winAnimation: WinState | null = null;
   private spinElapsed = 0;
   private currentSpeed = 0;
   private spinning = false;
+  private anticipating = false;
+  private anticipationElapsed = 0;
   private landing: LandingState | null = null;
 
   constructor(options: ReelOptions) {
     this.symbols = options.symbols;
     this.symbolsById = options.symbolsById;
     this.config = options.reel;
+    this.theme = options.theme;
+    this.rows = options.rows;
 
-    const { reel, theme } = options;
+    const { reel, theme, rows } = options;
 
-    this.windowHeight = reel.symbolHeight;
-    this.stripHeight = reel.symbolHeight * 3;
+    this.windowHeight = rows * reel.symbolHeight;
+    this.stripHeight = (rows + 2) * reel.symbolHeight;
 
     const mask = new Graphics()
       .roundRect(0, 0, reel.width, this.windowHeight, theme.cornerRadius)
@@ -69,9 +86,7 @@ export class Reel {
 
     this.view.addChild(background, mask, symbolLayer);
 
-    // One visible symbol plus one pooled view
-    // above and below the reel window.
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < rows + 2; index++) {
       const container = new Container();
 
       container.y = (index - 1) * reel.symbolHeight;
@@ -95,29 +110,65 @@ export class Reel {
       this.symbolViews.push({
         container,
         text,
+        row: -1,
       });
     }
+
+    const inset = theme.anticipationBorderWidth / 2;
+
+    this.anticipationFrame
+      .roundRect(
+        inset,
+        inset,
+        reel.width - theme.anticipationBorderWidth,
+        this.windowHeight - theme.anticipationBorderWidth,
+        theme.cornerRadius - inset,
+      )
+      .stroke({
+        width: theme.anticipationBorderWidth,
+        color: theme.anticipationColor,
+      });
+
+    this.anticipationFrame.visible = false;
+    this.view.addChild(this.anticipationFrame);
   }
 
-  show(symbolId: SymbolId): void {
-    const visibleView = this.symbolViews.find(
-      ({ container }) => container.y >= 0 && container.y < this.windowHeight,
-    );
+  show(symbolIds: readonly SymbolId[]): void {
+    for (const view of this.symbolViews) {
+      const row = Math.round(view.container.y / this.config.symbolHeight);
 
-    if (visibleView) {
-      this.setSymbol(visibleView, symbolId);
+      if (row >= 0 && row < this.rows && symbolIds[row] !== undefined) {
+        view.row = row;
+        this.setSymbol(view, symbolIds[row]);
+      } else {
+        view.row = -1;
+      }
     }
   }
 
   start(): void {
+    this.resetWinViews();
+    this.winAnimation?.resolve();
+    this.winAnimation = null;
+    this.winViews.length = 0;
+
     this.spinElapsed = 0;
     this.currentSpeed = 0;
     this.landing = null;
     this.landingTargets.clear();
+
+    for (const view of this.symbolViews) {
+      view.row = -1;
+    }
+
+    this.setAnticipating(false);
     this.spinning = true;
   }
 
   update(ticker: Ticker): void {
+    this.updateAnticipation(ticker.deltaMS);
+    this.updateWin(ticker.deltaMS);
+
     if (!this.spinning) {
       return;
     }
@@ -138,8 +189,7 @@ export class Reel {
 
     this.move((this.currentSpeed * ticker.deltaMS) / 1000);
   }
-
-  stop(symbolId: SymbolId): Promise<void> {
+  stop(symbolIds: readonly SymbolId[]): Promise<void> {
     if (!this.spinning || this.landing) {
       return Promise.resolve();
     }
@@ -147,7 +197,7 @@ export class Reel {
     const { symbolHeight } = this.config;
     const phase = modulo(this.symbolViews[0].container.y, symbolHeight);
     const alignment = phase < 0.001 ? 0 : symbolHeight - phase;
-    const distance = this.stripHeight + alignment;
+    const distance = Math.max(this.windowHeight, this.stripHeight) + alignment;
 
     const naturalDuration =
       (2 * distance * 1000) / Math.max(this.currentSpeed, 1);
@@ -156,7 +206,7 @@ export class Reel {
       Math.max(this.config.minStopDuration, naturalDuration),
     );
 
-    this.planLandingTarget(symbolId, distance);
+    this.planLandingTargets(symbolIds, distance);
 
     for (const [view, target] of this.landingTargets) {
       const y = view.container.y;
@@ -178,13 +228,50 @@ export class Reel {
     });
   }
 
+  setAnticipating(active: boolean): void {
+    this.anticipating = active;
+    this.anticipationElapsed = 0;
+    this.anticipationFrame.visible = active;
+    this.anticipationFrame.alpha = active ? this.theme.anticipationMinAlpha : 0;
+  }
+
+  playWin(rows: readonly number[], duration: number): Promise<void> {
+    this.resetWinViews();
+    this.winViews.length = 0;
+
+    for (const view of this.symbolViews) {
+      if (view.row >= 0 && rows.includes(view.row)) {
+        this.winViews.push(view);
+      }
+    }
+
+    if (this.winViews.length === 0) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.winAnimation = {
+        duration,
+        elapsed: 0,
+        resolve,
+      };
+    });
+  }
+
   destroy(): void {
+    this.setAnticipating(false);
     this.spinning = false;
     this.currentSpeed = 0;
 
     this.landing?.resolve();
+    this.winAnimation?.resolve();
+
     this.landing = null;
+    this.winAnimation = null;
     this.landingTargets.clear();
+
+    this.resetWinViews();
+    this.winViews.length = 0;
   }
 
   private updateLanding(deltaMS: number): void {
@@ -200,7 +287,6 @@ export class Reel {
     const travelled = landing.distance * easeOutQuad(progress);
 
     this.move(travelled - landing.travelled);
-
     landing.travelled = travelled;
 
     if (progress < 1) {
@@ -240,7 +326,10 @@ export class Reel {
     }
   }
 
-  private planLandingTarget(symbolId: SymbolId, distance: number): void {
+  private planLandingTargets(
+    symbolIds: readonly SymbolId[],
+    distance: number,
+  ): void {
     const wrapAt = this.windowHeight + this.config.symbolHeight;
 
     this.landingTargets.clear();
@@ -252,10 +341,14 @@ export class Reel {
         finalY -= this.stripHeight;
       }
 
-      const landsInWindow = Math.round(finalY / this.config.symbolHeight) === 0;
+      const row = Math.round(finalY / this.config.symbolHeight);
+      const landsInWindow =
+        row >= 0 && row < this.rows && symbolIds[row] !== undefined;
+
+      view.row = landsInWindow ? row : -1;
 
       if (landsInWindow) {
-        this.landingTargets.set(view, symbolId);
+        this.landingTargets.set(view, symbolIds[row]);
       }
     }
   }
@@ -264,5 +357,62 @@ export class Reel {
     const symbol = this.symbolsById.get(symbolId);
 
     view.text.text = symbol?.glyph ?? "?";
+  }
+
+  private updateAnticipation(deltaMS: number): void {
+    if (!this.anticipating) {
+      return;
+    }
+
+    this.anticipationElapsed += deltaMS;
+
+    const { anticipationMinAlpha, anticipationMaxAlpha } = this.theme;
+
+    this.anticipationFrame.alpha =
+      anticipationMinAlpha +
+      oscillate(
+        this.anticipationElapsed,
+        this.config.anticipationPulseDuration,
+      ) *
+        (anticipationMaxAlpha - anticipationMinAlpha);
+  }
+
+  private updateWin(deltaMS: number): void {
+    const animation = this.winAnimation;
+
+    if (!animation) {
+      return;
+    }
+
+    animation.elapsed = Math.min(
+      animation.elapsed + deltaMS,
+      animation.duration,
+    );
+
+    const progress = animation.elapsed / animation.duration;
+    const { cycles, scale, minAlpha } = this.theme.winPulse;
+    const pulse = Math.abs(Math.sin(progress * Math.PI * cycles));
+
+    for (const view of this.winViews) {
+      view.text.scale.set(1 + pulse * scale);
+      view.text.alpha = minAlpha + pulse * (1 - minAlpha);
+    }
+
+    if (progress < 1) {
+      return;
+    }
+
+    this.resetWinViews();
+    this.winViews.length = 0;
+    this.winAnimation = null;
+
+    animation.resolve();
+  }
+
+  private resetWinViews(): void {
+    for (const view of this.winViews) {
+      view.text.scale.set(1);
+      view.text.alpha = 1;
+    }
   }
 }

@@ -1,30 +1,45 @@
 import type { SymbolDefinition } from "../domain/types";
 
 export interface ReelConfig {
-  width: number;
-  symbolHeight: number;
   gap: number;
-  spinDuration: number;
-  stopDelay: number;
   speed: number;
-  accelerationDuration: number;
+  width: number;
+  stopDelay: number;
+  spinDuration: number;
+  symbolHeight: number;
   minStopDuration: number;
   maxStopDuration: number;
+  anticipationDelay: number;
+  accelerationDuration: number;
+  winAnimationDuration: number;
+  anticipationPulseDuration: number;
+}
+
+export interface WinPulseConfig {
+  cycles: number;
+  scale: number;
+  minAlpha: number;
 }
 
 export interface ThemeConfig {
-  symbolFontSize: number;
-  cornerRadius: number;
-  reelBackground: number;
   reelBorder: number;
+  cornerRadius: number;
+  symbolFontSize: number;
+  reelBackground: number;
   reelBorderWidth: number;
+  anticipationColor: number;
+  anticipationMinAlpha: number;
+  anticipationMaxAlpha: number;
+  anticipationBorderWidth: number;
+  winPulse: WinPulseConfig;
 }
 
 export interface GameConfig {
+  rows: number;
   reels: number;
-  symbols: readonly SymbolDefinition[];
-  betOptions: readonly number[];
   initialBalance: number;
+  betOptions: readonly number[];
+  symbols: readonly SymbolDefinition[];
   reel: ReelConfig;
   theme: ThemeConfig;
 }

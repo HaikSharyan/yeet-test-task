@@ -1,22 +1,59 @@
-import type { SpinResult, SymbolIndex } from "./types";
+import type { SpinResult, SymbolId, SymbolIndex } from "./types";
 
-function leadingMatchCount(result: SpinResult): number {
-  const firstSymbolId = result.reels[0];
+export interface RowWin {
+  row: number;
+  symbolId: SymbolId;
+  runLength: number;
+  payout: number;
+}
+
+export function leadingRunLength(result: SpinResult, row: number): number {
+  const firstSymbolId = result.reels[0]?.symbols[row];
 
   if (firstSymbolId === undefined) {
     return 0;
   }
 
-  let matchCount = 1;
+  let runLength = 1;
 
   while (
-    matchCount < result.reels.length &&
-    result.reels[matchCount] === firstSymbolId
+    runLength < result.reels.length &&
+    result.reels[runLength].symbols[row] === firstSymbolId
   ) {
-    matchCount++;
+    runLength++;
   }
 
-  return matchCount;
+  return runLength;
+}
+
+export function findRowWins(
+  result: SpinResult,
+  symbolsById: SymbolIndex,
+): RowWin[] {
+  const wins: RowWin[] = [];
+  const rowCount = result.reels[0]?.symbols.length ?? 0;
+
+  for (let row = 0; row < rowCount; row++) {
+    const symbolId = result.reels[0].symbols[row];
+    const runLength = leadingRunLength(result, row);
+
+    if (runLength < 2) {
+      continue;
+    }
+
+    const payout = symbolsById.get(symbolId)?.payouts[runLength] ?? 0;
+
+    if (payout > 0) {
+      wins.push({
+        row,
+        symbolId,
+        runLength,
+        payout,
+      });
+    }
+  }
+
+  return wins;
 }
 
 export function calculateWin(
@@ -24,20 +61,11 @@ export function calculateWin(
   bet: number,
   symbolsById: SymbolIndex,
 ): number {
-  const firstSymbolId = result.reels[0];
+  let totalWin = 0;
 
-  if (firstSymbolId === undefined) {
-    return 0;
+  for (const win of findRowWins(result, symbolsById)) {
+    totalWin += bet * win.payout;
   }
 
-  const symbol = symbolsById.get(firstSymbolId);
-
-  if (!symbol) {
-    return 0;
-  }
-
-  const matchCount = leadingMatchCount(result);
-  const multiplier = symbol.payouts[matchCount] ?? 0;
-
-  return bet * multiplier;
+  return totalWin;
 }

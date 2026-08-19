@@ -40,6 +40,7 @@ export const symbols = [
       2: 3,
       3: 50,
     },
+    highValue: true,
   },
   {
     id: 5,
@@ -50,6 +51,7 @@ export const symbols = [
       2: 5,
       3: 150,
     },
+    highValue: true,
   },
 ] as const satisfies readonly SymbolDefinition[];
 

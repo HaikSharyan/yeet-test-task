@@ -11,16 +11,24 @@ export function ResultDisplay({ result, symbolsById }: ResultDisplayProps) {
   }
 
   const resultLabel = result.reels
-    .map((symbolId) => {
-      return symbolsById.get(symbolId)?.label ?? "unknown";
+    .map((reel) => {
+      return reel.symbols
+        .map((symbolId) => {
+          return symbolsById.get(symbolId)?.label ?? "unknown";
+        })
+        .join(", ");
     })
-    .join(", ");
+    .join(" / ");
 
   return (
     <strong className="result-display" aria-label={resultLabel}>
-      {result.reels.map((symbolId, index) => (
-        <span key={`${symbolId}-${index}`} aria-hidden="true">
-          {symbolsById.get(symbolId)?.glyph ?? "?"}
+      {result.reels.map((reel, reelIndex) => (
+        <span className="result-reel" key={reelIndex}>
+          {reel.symbols.map((symbolId, rowIndex) => (
+            <span key={`${symbolId}-${rowIndex}`} aria-hidden="true">
+              {symbolsById.get(symbolId)?.glyph ?? "?"}
+            </span>
+          ))}
         </span>
       ))}
     </strong>

@@ -1,8 +1,9 @@
 import { Container } from "pixi.js";
+import { Reel } from "./Reel";
 import type { GameConfig } from "../config/types";
 import { PixiRuntime } from "../core/PixiRuntime";
+import { findRowWins } from "../domain/winCalculator";
 import type { SpinResult, SymbolIndex } from "../domain/types";
-import { Reel } from "./Reel";
 
 export class PixiGame {
   private readonly runtime = new PixiRuntime();
@@ -19,9 +20,9 @@ export class PixiGame {
   ) {}
 
   async init(host: HTMLDivElement): Promise<void> {
-    const { reels, reel } = this.config;
+    const { reels, rows, reel } = this.config;
     const stageWidth = reels * reel.width + (reels - 1) * reel.gap;
-    const stageHeight = reel.symbolHeight;
+    const stageHeight = rows * reel.symbolHeight;
 
     const mounted = await this.runtime.mount(
       host,
@@ -34,8 +35,8 @@ export class PixiGame {
         autoDensity: true,
       },
       (ticker) => {
-        for (const reel of this.reels) {
-          reel.update(ticker);
+        for (const reelView of this.reels) {
+          reelView.update(ticker);
         }
       },
     );
@@ -51,11 +52,12 @@ export class PixiGame {
       const reelView = new Reel({
         symbols: this.config.symbols,
         symbolsById: this.symbolsById,
+        rows,
         reel: this.config.reel,
         theme: this.config.theme,
       });
 
-      reelView.view.x = index * (this.config.reel.width + this.config.reel.gap);
+      reelView.view.x = index * (reel.width + reel.gap);
 
       reelsLayer.addChild(reelView.view);
       this.reels.push(reelView);
@@ -74,21 +76,24 @@ export class PixiGame {
     }
 
     for (let index = 0; index < this.reels.length; index++) {
-      const symbolId = result.reels[index];
+      const reelResult = result.reels[index];
 
-      if (symbolId !== undefined) {
-        this.reels[index].show(symbolId);
+      if (reelResult) {
+        this.reels[index].show(reelResult.symbols);
       }
     }
   }
 
-  async spin(result: SpinResult): Promise<void> {
+  async spin(result: SpinResult, anticipate: boolean): Promise<void> {
     if (this.spinning || this.destroyed) {
       return;
     }
 
     this.spinning = true;
     this.result = result;
+
+    const lastReel = this.reels.length - 1;
+    const stops: Promise<void>[] = [];
 
     try {
       for (const reel of this.reels) {
@@ -101,8 +106,6 @@ export class PixiGame {
         return;
       }
 
-      const stops: Promise<void>[] = [];
-
       for (let index = 0; index < this.reels.length; index++) {
         if (index > 0) {
           await this.wait(this.config.reel.stopDelay);
@@ -112,14 +115,59 @@ export class PixiGame {
           }
         }
 
-        const symbolId = result.reels[index];
+        if (anticipate && index === lastReel) {
+          await Promise.all(stops);
 
-        if (symbolId !== undefined) {
-          stops.push(this.reels[index].stop(symbolId));
+          if (this.destroyed) {
+            return;
+          }
+
+          const reel = this.reels[index];
+
+          reel.setAnticipating(true);
+
+          await this.wait(this.config.reel.anticipationDelay);
+
+          if (this.destroyed) {
+            return;
+          }
+
+          reel.setAnticipating(false);
+        }
+
+        const reelResult = result.reels[index];
+
+        if (reelResult) {
+          stops.push(this.reels[index].stop(reelResult.symbols));
         }
       }
 
       await Promise.all(stops);
+
+      if (this.destroyed) {
+        return;
+      }
+
+      const wins = findRowWins(result, this.symbolsById);
+
+      if (wins.length > 0) {
+        await Promise.all(
+          this.reels.map((reel, reelIndex) => {
+            const winningRows: number[] = [];
+
+            for (const win of wins) {
+              if (reelIndex < win.runLength) {
+                winningRows.push(win.row);
+              }
+            }
+
+            return reel.playWin(
+              winningRows,
+              this.config.reel.winAnimationDuration,
+            );
+          }),
+        );
+      }
     } finally {
       this.finishWait = null;
       this.spinning = false;

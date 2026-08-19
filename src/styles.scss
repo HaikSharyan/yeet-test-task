@@ -189,7 +189,13 @@ input {
 .result-display {
   display: flex;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
+}
+
+.result-reel {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
 }
 
 .controls {
