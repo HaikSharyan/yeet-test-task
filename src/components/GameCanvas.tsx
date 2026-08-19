@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { GameLoader } from "./GameLoader";
 import { PixiGame } from "../game/PixiGame";
 import { gameConfig } from "../config/gameConfig";
 import { symbolsById } from "../config/symbols";
 import type { SpinRequest, SpinResult } from "../domain/types";
+import type { PerformancePanelHandle } from "./PerformancePanel";
 
 interface GameCanvasProps {
   result: SpinResult;
   onReady: () => void;
   onSpinComplete: () => void;
+  performanceRef: RefObject<PerformancePanelHandle | null>;
   spinRequest: SpinRequest | null;
 }
 
@@ -19,6 +22,7 @@ export function GameCanvas({
   onReady,
   spinRequest,
   onSpinComplete,
+  performanceRef,
 }: GameCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<PixiGame | null>(null);
@@ -43,7 +47,9 @@ export function GameCanvas({
       return;
     }
 
-    const game = new PixiGame(gameConfig, symbolsById);
+    const game = new PixiGame(gameConfig, symbolsById, (fps, maxFrameTime) => {
+      performanceRef.current?.update(fps, maxFrameTime);
+    });
 
     gameRef.current = game;
     game.setResult(initialResultRef.current);
@@ -73,7 +79,7 @@ export function GameCanvas({
       gameRef.current = null;
       game.destroy();
     };
-  }, []);
+  }, [performanceRef]);
 
   useEffect(() => {
     if (!spinRequest || !gameRef.current) {

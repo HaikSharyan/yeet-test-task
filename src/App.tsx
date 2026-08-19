@@ -9,6 +9,8 @@ import { calculateWin } from "./domain/winCalculator";
 import { shouldAnticipate } from "./domain/anticipation";
 import { generateResult } from "./domain/resultGenerator";
 import type { SpinRequest, SpinResult } from "./domain/types";
+import { PerformancePanel } from "./components/PerformancePanel";
+import type { PerformancePanelHandle } from "./components/PerformancePanel";
 
 export default function App() {
   const [result, setResult] = useState<SpinResult>(() =>
@@ -25,6 +27,7 @@ export default function App() {
 
   const spinningRef = useRef(false);
   const spinRequestRef = useRef<SpinRequest | null>(null);
+  const performanceRef = useRef<PerformancePanelHandle>(null);
 
   const affordable = balance >= bet;
 
@@ -90,7 +93,11 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <GameHeader />
+      <GameHeader>
+        {gameConfig.performance.enabled && (
+          <PerformancePanel controllerRef={performanceRef} />
+        )}
+      </GameHeader>
 
       <section className="game-card">
         <GameCanvas
@@ -98,6 +105,7 @@ export default function App() {
           onReady={handleReady}
           spinRequest={spinRequest}
           onSpinComplete={completeSpin}
+          performanceRef={performanceRef}
         />
 
         <GameStats

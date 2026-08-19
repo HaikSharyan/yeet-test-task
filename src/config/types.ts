@@ -21,6 +21,11 @@ export interface WinPulseConfig {
   minAlpha: number;
 }
 
+export interface PerformanceConfig {
+  enabled: boolean;
+  sampleInterval: number;
+}
+
 export interface ThemeConfig {
   reelBorder: number;
   cornerRadius: number;
@@ -42,4 +47,5 @@ export interface GameConfig {
   symbols: readonly SymbolDefinition[];
   reel: ReelConfig;
   theme: ThemeConfig;
+  performance: PerformanceConfig;
 }

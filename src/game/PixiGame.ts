@@ -5,6 +5,8 @@ import { PixiRuntime } from "../core/PixiRuntime";
 import { findRowWins } from "../domain/winCalculator";
 import type { SpinResult, SymbolIndex } from "../domain/types";
 
+type PerformanceHandler = (fps: number, maxFrameTime: number) => void;
+
 export class PixiGame {
   private readonly runtime = new PixiRuntime();
   private readonly reels: Reel[] = [];
@@ -13,10 +15,14 @@ export class PixiGame {
   private destroyed = false;
   private spinning = false;
   private finishWait: (() => void) | null = null;
+  private performanceFrames = 0;
+  private performanceElapsed = 0;
+  private maxFrameTime = 0;
 
   constructor(
     private readonly config: GameConfig,
     private readonly symbolsById: SymbolIndex,
+    private readonly onPerformance: PerformanceHandler = () => {},
   ) {}
 
   async init(host: HTMLDivElement): Promise<void> {
@@ -37,6 +43,23 @@ export class PixiGame {
       (ticker) => {
         for (const reelView of this.reels) {
           reelView.update(ticker);
+        }
+
+        if (!this.config.performance.enabled) {
+          return;
+        }
+
+        this.performanceFrames++;
+        this.performanceElapsed += ticker.elapsedMS;
+        this.maxFrameTime = Math.max(this.maxFrameTime, ticker.elapsedMS);
+
+        if (this.performanceElapsed >= this.config.performance.sampleInterval) {
+          const fps = (this.performanceFrames * 1000) / this.performanceElapsed;
+
+          this.onPerformance(fps, this.maxFrameTime);
+          this.performanceFrames = 0;
+          this.performanceElapsed = 0;
+          this.maxFrameTime = 0;
         }
       },
     );

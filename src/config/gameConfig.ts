@@ -7,6 +7,10 @@ export const gameConfig = {
   symbols,
   betOptions: [1, 2, 5, 10],
   initialBalance: 100,
+  performance: {
+    enabled: true,
+    sampleInterval: 750,
+  },
   reel: {
     gap: 16,
     width: 150,
