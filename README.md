@@ -33,6 +33,8 @@ npm run dev
 
 New game rules belong in `domain`, rendering behavior in `game`, reusable UI in `components`, and tunable values in `config`.
 
+See [Architecture Reference](docs/ARCHITECTURE.md) for the complete runtime flow, state ownership, module catalog, configuration semantics, and extension rules.
+
 ## Quality checks
 
 ```bash
